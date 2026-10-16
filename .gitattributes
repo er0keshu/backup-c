@@ -1,0 +1,20 @@
+# 统一换行符:仓库内一律 LF,检出时也不做 CRLF 转换。
+# 否则 Windows 上 checkout 成 CRLF,会让 `gofmt -l` 报一堆"未格式化"(CI 会因此失败)。
+* text=auto eol=lf
+
+# 二进制文件不参与文本转换
+*.exe binary
+*.png binary
+*.jpg binary
+*.ico binary
+
+# Windows 批处理保持 CRLF(cmd.exe 对 LF 的 .bat 容错不一)
+*.bat text eol=crlf
+
+# Go / YAML / Markdown 明确用 LF
+*.go   text eol=lf
+*.mod  text eol=lf
+*.sum  text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.md   text eol=lf
