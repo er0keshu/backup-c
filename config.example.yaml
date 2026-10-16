@@ -35,17 +35,21 @@ targetDir: "D:\\backup\\config"
 interval: 10
 
 include:
-  - .zcode/v2/config.json
-  - .zcode/v2/setting.json
-  - .zcode/v2/provider_config.json
-  - .agents
+  # 目录: 递归带出该目录下所有文件(含空目录结构)
+  - Documents
+  - Projects/my-app
+  # 单个文件
+  - .gitconfig
+  # glob: 通配展开(** 跨层级)
+  - ".config/**/*.json"
 
 exclude:
-  - .git      # 任意层级的 .git 目录(整棵子树)
-  - .vscode   # 任意层级的 .vscode 目录
-  - .trae     # 任意层级的 .trae 目录
-# 用法示例:
-# exclude:
-#   - "*.log"            # 任意层级的 .log 文件
-#   - node_modules       # 任意层级的该目录(整棵子树)
-#   - .zcode/v2/cache/** # 指定子树
+  # 不含 / 的名字规则:按任意层级的名字匹配,命中目录则整棵子树跳过
+  - .git
+  - .vscode
+  - .trae
+  - node_modules
+  - "*.log"
+  # 含 / 的路径规则:按整路径匹配
+  # - Projects/my-app/dist
+  # - ".config/**/cache"

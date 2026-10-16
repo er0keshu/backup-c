@@ -11,6 +11,9 @@
 - 单文件分发，无运行时依赖（不需要 Node / Python）。
 - 单实例保护：同一时刻只允许一个 `run` 循环在跑。目标目录即使在源内也不会自我递归。
 
+> 快速开始：把 `config.example.yaml` 复制为 `config.yaml`，填上自己的 `sourceRoot`
+> （`config.yaml` 已被 `.gitignore` 忽略，你的真实路径不会进仓库）。
+
 ## 工作方式
 
 ```
@@ -39,43 +42,50 @@ Windows 计划任务 / 手动双击
 
 ```
 backup-c/
-├─ src/              # Go 源码
-│  ├─ main.go        # 入口：子命令 + 循环逻辑
-│  ├─ engine.go      # 备份引擎（镜像语义）
-│  ├─ logger.go      # 文件日志，按天切分
-│  ├─ lock_windows.go# 单实例锁
-│  ├─ task_windows.go# 计划任务管理（schtasks）
-│  ├─ engine_test.go # 单元测试
+├─ src/                 # Go 源码
+│  ├─ main.go           # 入口：子命令 + 循环逻辑
+│  ├─ engine.go         # 备份引擎（镜像语义）
+│  ├─ logger.go         # 文件日志，按天切分
+│  ├─ lock_windows.go   # 单实例锁
+│  ├─ task_windows.go   # 计划任务管理（schtasks）
+│  ├─ engine_test.go    # 单元测试
 │  ├─ go.mod / go.sum
-├─ config.yaml       # 备份清单：sourceRoot / targetDir / interval / include / exclude
-├─ build.bat         # 一键构建（编译优化 + UPX 压缩）
-├─ backup.exe        # 构建产物（输出到项目根）
-├─ dist/             # 默认备份目标（include 减 exclude 的完整镜像）
-└─ logs/             # 运行日志 backup-YYYY-MM-DD.log
+├─ config.example.yaml  # 清单模板：复制为 config.yaml 后按需修改
+├─ config.yaml          # 你的真实清单（本地，已被 .gitignore 忽略）
+├─ build.bat            # 一键构建 → 输出到 release/
+├─ release/             # 构建产物（已被忽略）：backup.exe + 起步 config.yaml
+│  ├─ backup.exe        # 发行版 exe
+│  ├─ config.yaml       # 由 config.example.yaml 复制而来
+│  └─ logs/             # 运行日志 backup-YYYY-MM-DD.log（首次运行后生成）
+└─ dist/                # 默认备份目标（include 减 exclude 的完整镜像）
 ```
 
-> `backup.exe` 放在**项目根**，运行时从自身所在目录定位 `config.yaml` / `logs/`；
+> 程序从**自身 exe 所在目录**定位 `config.yaml` / `logs/`，不依赖当前工作目录。
+> 因此 `release/` 是**自包含**的：整个文件夹拷到任何地方都能直接跑。
 > 备份目标默认写到同目录的 `dist/`（可用 `-d` 或 `config.targetDir` 改，支持多个）。
 
 ## 构建
 
-一键构建（编译优化 + UPX 压缩，产物输出到项目根）：
+一键构建（编译优化 + UPX 压缩，产物输出到 `release/`）：
 
 ```bat
 build.bat
 ```
+
+产物：`release/backup.exe`，以及从 `config.example.yaml` 复制出的 `release/config.yaml`
+（若已存在则不覆盖，避免冲掉你自己的路径）。整个 `release/` 即可直接分发。
 
 或手动：
 
 ```bat
 cd src
 set GOPROXY=https://goproxy.cn,direct
-go build -ldflags "-s -w" -trimpath -o ..\backup.exe .
+go build -ldflags "-s -w" -trimpath -o ..\release\backup.exe .
 ```
 
 > - `-s -w` 去掉符号表/DWARF，`-trimpath` 去掉源码路径：**4.6MB → 3.0MB**。
-> - 再经 **UPX** 压缩可到 **约 1.15MB**（38%）。需先 `scoop install upx`（或用任意方式装 upx 到 PATH）。
-> - 无控制台窗口版本：`go build -ldflags "-s -w -H=windowsgui" -trimpath -o ..\backup.exe .`
+> - 再经 **UPX** 压缩可到 **约 1.2MB**（38%）。需先 `scoop install upx`（或用任意方式装 upx 到 PATH）。
+> - 无控制台窗口版本：`go build -ldflags "-s -w -H=windowsgui" -trimpath -o ..\release\backup.exe .`
 >   （无窗口时 stdout 不可见，但日志仍写入 `logs/`。）
 
 ### 关于 UPX 与杀毒软件
@@ -143,6 +153,12 @@ backup.exe install -i 20 -d "D:\a,E:\b"
 
 ## 清单（config.yaml）
 
+仓库里提供模板 `config.example.yaml`，复制为 `config.yaml` 后修改（后者已被 `.gitignore` 忽略）：
+
+```bat
+copy config.example.yaml config.yaml
+```
+
 ```yaml
 sourceRoot: "C:\\Users\\YourName"   # 源根目录（绝对路径，建议显式指定）
 
@@ -156,14 +172,18 @@ targetDir: "D:\\backup"             # 备份目标目录（可选；不设则用
 interval: 10                        # 备份间隔（分钟）。-i 参数可临时覆盖；不设则默认 10
 
 include:                            # 要备份的路径/模式（相对 sourceRoot）
-  - .zcode/v2/provider_config.json  # 单个文件
-  - .ssh                            # 整个目录（递归）
-  - doc/**/*.md                     # glob 通配
+  - Documents                       # 整个目录（递归）
+  - Projects/my-app
+  - .gitconfig                      # 单个文件
+  - ".config/**/*.json"             # glob 通配
 
 exclude:                            # 排除规则，优先级高于 include
-  - "*.log"                         # 不含 / 的规则按「任意层级的名字」匹配
-  - node_modules                    # 命中目录 => 整个子树跳过
-  - doc/private/**                  # 含 / 的规则按整路径 glob，也匹配祖先目录
+  - .git                            # 不含 / 的规则按「任意层级的名字」匹配；命中目录 => 整棵子树跳过
+  - .vscode
+  - .trae
+  - node_modules
+  - "*.log"
+  # - Projects/my-app/dist          # 含 / 的规则按整路径 glob，也匹配祖先目录
 ```
 
 ### 为什么要有 `sourceRoot`

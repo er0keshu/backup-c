@@ -1,6 +1,9 @@
 # 构建产物
 backup.exe
 
+# 发布目录(backup.exe + 运行时 config.yaml),二进制走 GitHub Release 分发
+release/
+
 # 运行日志
 logs/
 
