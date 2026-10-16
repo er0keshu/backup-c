@@ -50,6 +50,7 @@ backup-c/
 │  ├─ task_windows.go   # 计划任务管理（schtasks）
 │  ├─ engine_test.go    # 单元测试
 │  ├─ go.mod / go.sum
+├─ .github/workflows/   # CI：测试 + 打包（Windows），打 tag 时发 Release
 ├─ config.example.yaml  # 清单模板：复制为 config.yaml 后按需修改
 ├─ config.yaml          # 你的真实清单（本地，已被 .gitignore 忽略）
 ├─ build.bat            # 一键构建 → 输出到 release/
@@ -92,6 +93,22 @@ go build -ldflags "-s -w" -trimpath -o ..\release\backup.exe .
 
 UPX 压缩会显著减小体积，但**压缩过的 exe 较易被杀毒软件启发式误报**（这是壳的常见副作用）。
 若被拦截，改用未压缩版本（跳过 `build.bat` 的 UPX 步骤，或直接 `go build`）即可 —— 功能完全相同。
+
+### CI（GitHub Actions）
+
+`.github/workflows/build.yml` 在 **windows-latest** 上自动跑（仅 Windows 平台，
+因为 `lock_windows.go` / `task_windows.go` 带 `//go:build windows`）：
+
+- 每次 push / PR：`gofmt` 检查 → `go vet` → `go test` → 构建（压缩 + 未压缩两个 exe）→ 上传 Artifacts；
+- 推送 **`v*` 标签**时额外创建 GitHub Release，附上 `backup.exe`、`backup-uncompressed.exe` 与 `config.yaml`。
+
+版本号在构建时注入（`-X main.version=...`）：打 tag 时用 tag 名，否则用 `0.0.0-dev+<短sha>`。
+发布一个版本：
+
+```bat
+git tag v1.0.0
+git push origin v1.0.0
+```
 
 ## 使用
 

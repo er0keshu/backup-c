@@ -27,7 +27,9 @@ import (
 	"time"
 )
 
-const version = "1.0.0"
+// version 可在构建时注入: go build -ldflags "-X main.version=v1.2.3"
+// 未注入时为下方默认值。
+var version = "1.0.0"
 
 const taskName = "backup-c"
 const defaultInterval = 10 // 分钟

@@ -1,0 +1,110 @@
+name: build
+
+# 每次 push 自动测试 + 打包;打 v* 标签时额外创建 GitHub Release。
+on:
+  push:
+    branches: [ master, main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+# 创建 Release 需要写权限
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # lock_windows.go / task_windows.go 带 //go:build windows,必须在 Windows 上构建
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: src/go.mod
+          cache-dependency-path: src/go.sum
+
+      - name: gofmt check
+        working-directory: src
+        shell: pwsh
+        run: |
+          $bad = gofmt -l .
+          if ($bad) {
+            Write-Error "gofmt 未通过:`n$bad"
+            exit 1
+          }
+
+      - name: go vet
+        working-directory: src
+        run: go vet ./...
+
+      - name: go test
+        working-directory: src
+        run: go test ./...
+
+      # 版本号: tag 用 tag 名,否则用 dev 版本(短 sha)
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        run: |
+          if ('${{ github.ref_type }}' -eq 'tag') {
+            $v = '${{ github.ref_name }}'
+          } else {
+            $v = "0.0.0-dev+$('${{ github.sha }}'.Substring(0,7))"
+          }
+          "value=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "version = $v"
+
+      - name: Build (uncompressed)
+        working-directory: src
+        shell: pwsh
+        run: |
+          # release/ 被 .gitignore 忽略,不会随 checkout 带出,先建目录
+          New-Item -ItemType Directory -Force -Path ../release | Out-Null
+          go build -ldflags "-s -w -X main.version=${{ steps.ver.outputs.value }}" -trimpath -o ../release/backup-uncompressed.exe .
+
+      - name: Stage release files
+        shell: pwsh
+        run: |
+          Copy-Item release/backup-uncompressed.exe release/backup.exe -Force
+          Copy-Item config.example.yaml release/config.yaml -Force
+          Get-ChildItem release | Format-Table Name, Length
+
+      - name: UPX compress
+        shell: pwsh
+        run: |
+          # 装不上就跳过压缩,保留未压缩版(功能相同),不让 CI 失败
+          # choco 的 shim 落在 C:\ProgramData\chocolatey\bin,该目录已在 PATH 中
+          choco install upx --no-progress -y | Out-Null
+          if (-not (Get-Command upx -ErrorAction SilentlyContinue)) {
+            Write-Warning "upx 不可用,跳过压缩"
+            exit 0
+          }
+          upx --best --no-backup release/backup.exe
+          Get-ChildItem release | Format-Table Name, Length
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-c-${{ steps.ver.outputs.value }}
+          path: |
+            release/backup.exe
+            release/backup-uncompressed.exe
+            release/config.yaml
+
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create '${{ github.ref_name }}' `
+            'release/backup.exe' `
+            'release/backup-uncompressed.exe' `
+            'release/config.yaml' `
+            --title '${{ github.ref_name }}' `
+            --generate-notes
