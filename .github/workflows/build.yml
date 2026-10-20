@@ -65,7 +65,8 @@ jobs:
         run: |
           # release/ 被 .gitignore 忽略,不会随 checkout 带出,先建目录
           New-Item -ItemType Directory -Force -Path ../release | Out-Null
-          go build -ldflags "-s -w -X main.version=${{ steps.ver.outputs.value }}" -trimpath -o ../release/backup-uncompressed.exe .
+          # -H=windowsgui: 无黑窗口(纯后台);-X 注入版本号
+          go build -ldflags "-s -w -H=windowsgui -X main.version=${{ steps.ver.outputs.value }}" -trimpath -o ../release/backup-uncompressed.exe .
 
       - name: Stage release files
         shell: pwsh

@@ -9,9 +9,9 @@ set GOPROXY=https://goproxy.cn,direct
 
 if not exist release mkdir release
 
-echo [1/4] go build (-s -w -trimpath)...
+echo [1/4] go build (-s -w -H=windowsgui -trimpath)...
 pushd src
-go build -ldflags "-s -w" -trimpath -o ..\release\backup.exe .
+go build -ldflags "-s -w -H=windowsgui" -trimpath -o ..\release\backup.exe .
 if errorlevel 1 (
   popd
   echo build failed

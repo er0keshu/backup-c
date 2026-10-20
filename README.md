@@ -81,13 +81,14 @@ build.bat
 ```bat
 cd src
 set GOPROXY=https://goproxy.cn,direct
-go build -ldflags "-s -w" -trimpath -o ..\release\backup.exe .
+go build -ldflags "-s -w -H=windowsgui" -trimpath -o ..\release\backup.exe .
 ```
 
+> - `-H=windowsgui` 编为 GUI 子系统：**计划任务/自启/双击启动时不弹黑窗口**，纯后台运行。
+>   代价是直接从控制台跑时看不到 stdout——但所有输出本来就写 `logs/`，且 `version` 等
+>   命令经重定向仍可见。若需要传统控制台版，去掉该 flag 即可。
 > - `-s -w` 去掉符号表/DWARF，`-trimpath` 去掉源码路径：**4.6MB → 3.0MB**。
 > - 再经 **UPX** 压缩可到 **约 1.2MB**（38%）。需先 `scoop install upx`（或用任意方式装 upx 到 PATH）。
-> - 无控制台窗口版本：`go build -ldflags "-s -w -H=windowsgui" -trimpath -o ..\release\backup.exe .`
->   （无窗口时 stdout 不可见，但日志仍写入 `logs/`。）
 
 ### 关于 UPX 与杀毒软件
 
